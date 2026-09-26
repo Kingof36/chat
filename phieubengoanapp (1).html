@@ -9,6 +9,7 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
 
+    <!-- Config Modal -->
     <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h2 class="text-xl font-bold text-pink-600 mb-2"><i class="fa-solid fa-gear mr-2"></i>Cấu Hình Google Sheets API</h2>
@@ -21,6 +22,7 @@
         </div>
     </div>
 
+    <!-- App Container -->
     <div id="appContainer" class="min-h-screen flex flex-col hidden">
         <!-- Top Navigation Bar -->
         <header class="bg-white shadow-sm sticky top-0 z-40 px-4 py-2 flex justify-between items-center">
@@ -138,6 +140,7 @@
         </div>
     </div>
 
+    <!-- Admin Modal -->
     <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
@@ -151,6 +154,7 @@
         </div>
     </div>
 
+    <!-- Login Modal -->
     <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center">
             <div class="bg-pink-100 text-pink-600 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -164,7 +168,7 @@
     </div>
 
     <script>
-        // URL Google Apps Script mới được cấu hình theo yêu cầu của bạn
+        // URL Google Apps Script của bạn
         let SCRIPT_URL = localStorage.getItem('pbn_script_url') || 'https://script.google.com/macros/s/AKfycbzhOIAS139n4nK_1pUE_Y6kqwJwqyseBljMc4Vlu9MLbSSAt-dl9bDU7DWt8hm8fhYG/exec';
         let currentUser = JSON.parse(localStorage.getItem('pbn_current_user')) || null;
         let activeChatUser = null;
@@ -224,7 +228,8 @@
             syncWithCloud(false);
         }
 
-        async function syncWithCloud(isInitial = false) {
+        // Sử dụng JSONP / Image Ping để tránh hoàn toàn lỗi chặn CORS của trình duyệt trên GitHub Pages
+        function syncWithCloud(isInitial = false) {
             if(!SCRIPT_URL || SCRIPT_URL === 'local') {
                 document.getElementById('syncText').innerText = 'Local Mode';
                 document.getElementById('syncStatusBadge').className = "text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition";
@@ -232,43 +237,63 @@
                 return;
             }
 
-            try {
-                document.getElementById('syncText').innerText = 'Đang đồng bộ...';
-                let controller = new AbortController();
-                let timeoutId = setTimeout(() => controller.abort(), 8000);
-
-                let response = await fetch(SCRIPT_URL, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                let data = await response.json();
+            document.getElementById('syncText').innerText = 'Đang đồng bộ Sheets...';
+            
+            // Định nghĩa hàm callback toàn cục cho JSONP
+            window.jsonpCallback = function(data) {
                 if(data && data.users) {
                     db = data;
                     checkWeekReset();
                     localStorage.setItem('pbn_local_db', JSON.stringify(db));
+                    document.getElementById('syncText').innerText = 'Sheets Connected';
+                    document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
                 }
-                document.getElementById('syncText').innerText = 'Sheets Connected';
-                document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
-            } catch(e) {
-                console.log('Network/CORS fallback to local database:', e);
+                initApp();
+            };
+
+            let scriptTag = document.createElement('script');
+            scriptTag.src = SCRIPT_URL + (SCRIPT_URL.indexOf('?') > -1 ? '&' : '?') + 'callback=jsonpCallback&t=' + Date.now();
+            scriptTag.onerror = function() {
+                console.log('JSONP Load error, using local storage cache.');
                 document.getElementById('syncText').innerText = 'Sheets Connected (Cached)';
                 document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
-            }
-            initApp();
+                initApp();
+            };
+            document.body.appendChild(scriptTag);
         }
 
-        async function saveDb() {
+        function saveDb() {
             checkWeekReset();
             localStorage.setItem('pbn_local_db', JSON.stringify(db));
             
             if(!SCRIPT_URL || SCRIPT_URL === 'local') return;
+            
+            // Gửi dữ liệu ngầm không bị chặn CORS bằng Form / Image Ping
             try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(db)
-                });
+                let form = document.createElement('form');
+                form.method = 'POST';
+                form.action = SCRIPT_URL;
+                form.target = 'hidden_iframe';
+                
+                let input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'postData';
+                input.value = JSON.stringify(db);
+                form.appendChild(input);
+
+                if(!document.getElementById('hidden_iframe')) {
+                    let iframe = document.createElement('iframe');
+                    iframe.id = 'hidden_iframe';
+                    iframe.name = 'hidden_iframe';
+                    iframe.style.display = 'none';
+                    document.body.appendChild(iframe);
+                }
+
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
             } catch(e) {
-                console.log('Cloud sync error:', e);
+                console.log('Cloud sync save error:', e);
             }
         }
 
