@@ -164,8 +164,8 @@
     </div>
 
     <script>
-        // Cập nhật URL Google Apps Script mặc định mới theo yêu cầu
-        let SCRIPT_URL = localStorage.getItem('pbn_script_url') || 'https://script.google.com/macros/s/AKfycby72OHG04hgXlm-x0rXDn5xrbVU089wsLn3iExxP0cRuZhgRnYKxeNs7EZNN6splX7BNA/exec';
+        // URL Google Apps Script mới được cấu hình theo yêu cầu của bạn
+        let SCRIPT_URL = localStorage.getItem('pbn_script_url') || 'https://script.google.com/macros/s/AKfycbzhOIAS139n4nK_1pUE_Y6kqwJwqyseBljMc4Vlu9MLbSSAt-dl9bDU7DWt8hm8fhYG/exec';
         let currentUser = JSON.parse(localStorage.getItem('pbn_current_user')) || null;
         let activeChatUser = null;
 
@@ -224,7 +224,6 @@
             syncWithCloud(false);
         }
 
-        // Cloud & Local synchronization with timeout safety
         async function syncWithCloud(isInitial = false) {
             if(!SCRIPT_URL || SCRIPT_URL === 'local') {
                 document.getElementById('syncText').innerText = 'Local Mode';
@@ -236,7 +235,7 @@
             try {
                 document.getElementById('syncText').innerText = 'Đang đồng bộ...';
                 let controller = new AbortController();
-                let timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+                let timeoutId = setTimeout(() => controller.abort(), 8000);
 
                 let response = await fetch(SCRIPT_URL, { signal: controller.signal });
                 clearTimeout(timeoutId);
