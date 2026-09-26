@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mạng Xã Hội Phiếu Bé Ngoan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+
+    <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 class="text-xl font-bold text-pink-600 mb-2"><i class="fa-solid fa-gear mr-2"></i>Cấu Hình Google Sheets API</h2>
+            <p class="text-sm text-gray-600 mb-4">Nhập URL Google Apps Script Web App của bạn để kết nối lưu trữ trực tuyến, hoặc bấm <strong>Dùng Demo Local</strong> để trải nghiệm ngay trên trình duyệt.</p>
+            <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 border rounded-lg mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
+            <div class="flex justify-end space-x-2">
+                <button onclick="saveConfig(true)" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition">Dùng Demo Local</button>
+                <button onclick="saveConfig(false)" class="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm hover:bg-pink-700 transition">Kết Nối Sheets</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="appContainer" class="min-h-screen flex flex-col hidden">
+        <!-- Top Navigation Bar -->
+        <header class="bg-white shadow-sm sticky top-0 z-40 px-4 py-2 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-pink-500 text-white font-bold p-2 rounded-xl text-xl flex items-center justify-center w-10 h-10 shadow">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+                <h1 class="text-xl font-bold text-pink-600 tracking-wide hidden sm:block">PBN Social</h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <span id="currentUserBadge" class="text-sm font-semibold bg-pink-100 text-pink-700 px-3 py-1 rounded-full">
+                    Đang tải...
+                </span>
+                <button onclick="openAdminPanel()" id="adminNavBtn" class="hidden text-sm bg-purple-100 text-purple-700 font-medium px-3 py-1 rounded-full hover:bg-purple-200 transition">
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Admin Panel
+                </button>
+                <button onclick="logout()" class="text-gray-500 hover:text-red-600 text-sm transition" title="Đăng xuất"><i class="fa-solid fa-right-from-bracket text-lg"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Workspace Grid -->
+        <div class="flex-1 max-w-6xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+            
+            <!-- Sidebar / Navigation Tabs -->
+            <div class="bg-white rounded-xl shadow-sm p-4 space-y-2 h-fit">
+                <button onclick="switchTab('feed')" id="nav-feed" class="w-full text-left px-3 py-2 rounded-lg font-medium text-pink-600 bg-pink-50 flex items-center space-x-3 transition">
+                    <i class="fa-solid fa-newspaper w-5"></i><span>Bảng Tin</span>
+                </button>
+                <button onclick="switchTab('messages')" id="nav-messages" class="w-full text-left px-3 py-2 rounded-lg font-medium text-gray-600 hover:bg-gray-50 flex items-center space-x-3 transition">
+                    <i class="fa-solid fa-comments w-5"></i><span>Nhắn Tin</span>
+                </button>
+                <button onclick="switchTab('friends')" id="nav-friends" class="w-full text-left px-3 py-2 rounded-lg font-medium text-gray-600 hover:bg-gray-50 flex items-center space-x-3 transition">
+                    <i class="fa-solid fa-user-group w-5"></i><span>Bạn Bè & Phiếu</span>
+                </button>
+                <button onclick="switchTab('leaderboard')" id="nav-leaderboard" class="w-full text-left px-3 py-2 rounded-lg font-medium text-gray-600 hover:bg-gray-50 flex items-center space-x-3 transition">
+                    <i class="fa-solid fa-trophy w-5 text-amber-500"></i><span>BXH Tuần Này</span>
+                </button>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="md:col-span-3 space-y-4">
+
+                <!-- FEED TAB -->
+                <div id="tab-feed" class="space-y-4">
+                    <div class="bg-white rounded-xl shadow-sm p-4">
+                        <textarea id="postContent" placeholder="Bạn đang nghĩ gì thế? Chia sẻ việc ngoan hôm nay..." class="w-full border-0 focus:ring-0 resize-none text-sm p-2 outline-none" rows="2"></textarea>
+                        <div class="flex justify-between items-center border-t pt-3 mt-2">
+                            <span class="text-xs text-gray-400">Lan tỏa năng lượng tích cực mỗi ngày</span>
+                            <button onclick="createPost()" class="bg-pink-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-pink-700 transition">Đăng bài</button>
+                        </div>
+                    </div>
+                    <div id="postsContainer" class="space-y-4">
+                        <!-- Dynamic Posts Feed -->
+                    </div>
+                </div>
+
+                <!-- MESSAGES TAB -->
+                <div id="tab-messages" class="bg-white rounded-xl shadow-sm h-[70vh] flex hidden overflow-hidden">
+                    <div class="w-1/3 border-r p-3 overflow-y-auto">
+                        <h3 class="font-bold text-sm text-gray-700 mb-3">Đoạn chat bạn bè</h3>
+                        <div id="chatFriendsList" class="space-y-1">
+                            <!-- Dynamic Chat Friends -->
+                        </div>
+                    </div>
+                    <div class="w-2/3 flex flex-col bg-gray-50/30">
+                        <div id="chatHeader" class="p-3 border-b font-bold text-sm text-gray-700 bg-white flex items-center">
+                            Chọn một người bạn để bắt đầu trò chuyện
+                        </div>
+                        <div id="chatMessages" class="flex-1 p-4 overflow-y-auto space-y-3">
+                            <div class="text-center text-gray-400 text-sm mt-10">Chưa chọn cuộc trò chuyện nào</div>
+                        </div>
+                        <div id="chatInputArea" class="p-3 border-t bg-white flex space-x-2 hidden">
+                            <input type="text" id="chatMessageInput" placeholder="Nhập tin nhắn..." class="flex-1 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400" onkeypress="if(event.key==='Enter') sendChatMessage()">
+                            <button onclick="sendChatMessage()" class="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700 transition"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FRIENDS & PHIẾU BÉ NGOAN TAB -->
+                <div id="tab-friends" class="space-y-4 hidden">
+                    <div class="bg-white rounded-xl shadow-sm p-4">
+                        <h3 class="font-bold text-gray-800 mb-4"><i class="fa-solid fa-award text-pink-500 mr-2"></i>Phiếu Bé Ngoan Của Tôi (Tuần Hiện Tại)</h3>
+                        <div class="flex items-center space-x-4 bg-pink-50 p-4 rounded-xl border border-pink-100">
+                            <div class="text-4xl text-pink-600 font-black" id="myTicketCount">0</div>
+                            <div>
+                                <p class="text-sm font-semibold text-pink-900">Tổng phiếu tích lũy tuần này</p>
+                                <p class="text-xs text-pink-700">Phiếu do Admin phát sẽ được tổng kết và tự động reset về 0 khi sang tuần mới.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-4">
+                        <h3 class="font-bold text-gray-800 mb-4">Danh Sách Thành Viên Cộng Đồng</h3>
+                        <div id="allUsersList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Dynamic Users List -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LEADERBOARD TAB -->
+                <div id="tab-leaderboard" class="bg-white rounded-xl shadow-sm p-4 hidden">
+                    <h3 class="font-bold text-gray-800 mb-1 flex items-center">
+                        <i class="fa-solid fa-trophy text-amber-500 mr-2"></i> Bảng Xếp Hạng Phiếu Bé Ngoan Tuần Này
+                    </h3>
+                    <p class="text-xs text-gray-500 mb-4">Danh sách top thành viên ngoan ngoãn nhất tuần (hệ thống tự động reset hàng tuần).</p>
+                    <div id="leaderboardList" class="space-y-2">
+                        <!-- Dynamic Leaderboard -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-purple-700"><i class="fa-solid fa-shield-halved mr-2"></i>Bảng Quản Trị - Phát Phiếu Bé Ngoan</h2>
+                <button onclick="closeAdminPanel()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">Thêm hoặc thu hồi Phiếu Bé Ngoan cho các thành viên trong tuần này.</p>
+            <div id="adminUserList" class="space-y-3">
+                <!-- Dynamic Admin User List -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center">
+            <div class="bg-pink-100 text-pink-600 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+                <i class="fa-solid fa-user-astronaut"></i>
+            </div>
+            <h2 class="text-xl font-bold text-pink-600 mb-1">Tham Gia Mạng Xã Hội</h2>
+            <p class="text-xs text-gray-500 mb-4">Nhập tên của bạn để bắt đầu (Đặt tên chứa chữ 'admin' nếu muốn làm quản trị viên thử nghiệm).</p>
+            <input type="text" id="loginNameInput" placeholder="Ví dụ: Hoàng Lan" class="w-full px-3 py-2 border rounded-lg mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400" onkeypress="if(event.key==='Enter') submitLogin()">
+            <button onclick="submitLogin()" class="w-full bg-pink-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-pink-700 transition">Vào Ứng Dụng</button>
+        </div>
+    </div>
+
+    <script>
+        // Pre-configured Google Apps Script Web App URL
+        let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEHN7GaFaNh0HXxw47iBY73Bb-cnqpxPvxRtqa5arrU6SlQ8sxV2lrnkFb2oxzGUAXjg/exec';
+        let currentUser = JSON.parse(localStorage.getItem('pbn_current_user')) || null;
+        let activeChatUser = null;
+
+        // Local & Cloud storage database structure
+        let db = {
+            users: [
+                { id: '1', name: 'Admin Tổng', role: 'admin', tickets: 5 },
+                { id: '2', name: 'Nguyễn Văn An', role: 'user', tickets: 3 },
+                { id: '3', name: 'Trần Thị Bình', role: 'user', tickets: 2 }
+            ],
+            posts: [
+                { id: 'p1', authorId: '2', authorName: 'Nguyễn Văn An', content: 'Hôm nay mình đã tự giác rửa bát và quét nhà sạch sẽ!', time: '10:00 - Hôm nay' }
+            ],
+            messages: [
+                { senderId: '2', receiverId: '3', content: 'Chào Bình, tuần này bạn được mấy phiếu rồi?', time: '10:05' }
+            ],
+            friends: [
+                { user1: '2', user2: '3' }
+            ],
+            lastResetWeek: getWeekNumber(new Date())
+        };
+
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+            let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+            return d.getUTCFullYear() + '-W' + weekNo;
+        }
+
+        window.onload = function() {
+            document.getElementById('configModal').classList.add('hidden');
+            syncWithCloud(true); // Fetch initial data from Google Sheets if connected
+        }
+
+        // Cloud Synchronization with Google Sheets / Apps Script
+        async function syncWithCloud(isInitial = false) {
+            if(!SCRIPT_URL) {
+                initApp();
+                return;
+            }
+            try {
+                let response = await fetch(SCRIPT_URL);
+                let data = await response.json();
+                if(data && data.users) {
+                    db = data;
+                    checkWeekReset();
+                }
+            } catch(e) {
+                console.log('Using local fallback due to network/CORS restriction:', e);
+            }
+            initApp();
+        }
+
+        async function saveDb() {
+            checkWeekReset();
+            // Save locally immediately for responsiveness
+            localStorage.setItem('pbn_local_db', JSON.stringify(db));
+            
+            if(!SCRIPT_URL) return;
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(db)
+                });
+            } catch(e) {
+                console.log('Cloud sync error:', e);
+            }
+        }
+
+        // Automatic weekly reset mechanism
+        function checkWeekReset() {
+            let currentWeek = getWeekNumber(new Date());
+            if(db.lastResetWeek !== currentWeek) {
+                db.users.forEach(function(u) { u.tickets = 0; });
+                db.lastResetWeek = currentWeek;
+            }
+        }
+
+        function initApp() {
+            if(!currentUser) {
+                document.getElementById('loginModal').classList.remove('hidden');
+            } else {
+                document.getElementById('appContainer').classList.remove('hidden');
+                updateUI();
+            }
+        }
+
+        function submitLogin() {
+            let name = document.getElementById('loginNameInput').value.trim();
+            if(!name) return;
+            let existing = db.users.find(function(u) { return u.name.toLowerCase() === name.toLowerCase(); });
+            if(existing) {
+                currentUser = existing;
+            } else {
+                currentUser = {
+                    id: Date.now().toString(),
+                    name: name,
+                    role: name.toLowerCase().includes('admin') ? 'admin' : 'user',
+                    tickets: 0
+                };
+                db.users.push(currentUser);
+                saveDb();
+            }
+            localStorage.setItem('pbn_current_user', JSON.stringify(currentUser));
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('appContainer').classList.remove('hidden');
+            updateUI();
+        }
+
+        function logout() {
+            localStorage.removeItem('pbn_current_user');
+            currentUser = null;
+            document.getElementById('appContainer').classList.add('hidden');
+            document.getElementById('loginModal').classList.remove('hidden');
+        }
+
+        function updateUI() {
+            document.getElementById('currentUserBadge').innerText = currentUser.name + ' (' + (currentUser.role === 'admin' ? 'Admin' : 'Thành viên') + ')';
+            if(currentUser.role === 'admin') {
+                document.getElementById('adminNavBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('adminNavBtn').classList.add('hidden');
+            }
+
+            let me = db.users.find(function(u) { return u.id === currentUser.id; });
+            document.getElementById('myTicketCount').innerText = me ? me.tickets : 0;
+
+            renderPosts();
+            renderFriends();
+            renderChatFriends();
+            renderLeaderboard();
+        }
+
+        function switchTab(tabName) {
+            ['feed', 'messages', 'friends', 'leaderboard'].forEach(function(t) {
+                document.getElementById('tab-' + t).classList.add('hidden');
+                document.getElementById('nav-' + t).className = "w-full text-left px-3 py-2 rounded-lg font-medium text-gray-600 hover:bg-gray-50 flex items-center space-x-3 transition";
+            });
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            document.getElementById('nav-' + tabName).className = "w-full text-left px-3 py-2 rounded-lg font-medium text-pink-600 bg-pink-50 flex items-center space-x-3 transition";
+            
+            if(tabName === 'messages' || tabName === 'friends' || tabName === 'leaderboard') {
+                syncWithCloud();
+            }
+        }
+
+        // Post functionality
+        function createPost() {
+            let content = document.getElementById('postContent').value.trim();
+            if(!content) return;
+            db.posts.unshift({
+                id: Date.now().toString(),
+                authorId: currentUser.id,
+                authorName: currentUser.name,
+                content: content,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' - Hôm nay'
+            });
+            saveDb();
+            document.getElementById('postContent').value = '';
+            renderPosts();
+        }
+
+        function renderPosts() {
+            let container = document.getElementById('postsContainer');
+            container.innerHTML = db.posts.map(function(p) {
+                return '<div class="bg-white rounded-xl shadow-sm p-4 space-y-2">' +
+                    '<div class="flex items-center space-x-2">' +
+                        '<div class="w-8 h-8 bg-pink-200 text-pink-700 font-bold rounded-full flex items-center justify-center text-sm">' + p.authorName.charAt(0) + '</div>' +
+                        '<div>' +
+                            '<h4 class="text-sm font-bold text-gray-800">' + p.authorName + '</h4>' +
+                            '<span class="text-xs text-gray-400">' + p.time + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<p class="text-sm text-gray-700 pl-10">' + p.content + '</p>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Friends functionality
+        function renderFriends() {
+            let container = document.getElementById('allUsersList');
+            container.innerHTML = db.users.filter(function(u) { return u.id !== currentUser.id; }).map(function(u) {
+                let isFriend = db.friends.some(function(f) { 
+                    return (f.user1 === currentUser.id && f.user2 === u.id) || (f.user1 === u.id && f.user2 === currentUser.id); 
+                });
+                return '<div class="border rounded-xl p-3 flex items-center justify-between bg-white">' +
+                    '<div class="flex items-center space-x-3">' +
+                        '<div class="w-10 h-10 bg-gray-200 text-gray-700 font-bold rounded-full flex items-center justify-center">' + u.name.charAt(0) + '</div>' +
+                        '<div>' +
+                            '<h4 class="text-sm font-bold text-gray-800">' + u.name + '</h4>' +
+                            '<span class="text-xs text-pink-600 font-medium"><i class="fa-solid fa-award mr-1"></i>' + u.tickets + ' phiếu bé ngoan</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div>' +
+                        (isFriend ? 
+                            '<span class="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-medium"><i class="fa-solid fa-check mr-1"></i>Đã kết bạn</span>' :
+                            '<button onclick="addFriend(\'' + u.id + '\')" class="text-xs bg-pink-50 text-pink-600 hover:bg-pink-100 px-3 py-1.5 rounded-lg font-medium transition">Kết bạn</button>') +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+
+        function addFriend(targetId) {
+            db.friends.push({ user1: currentUser.id, user2: targetId });
+            saveDb();
+            renderFriends();
+            renderChatFriends();
+        }
+
+        // Chat functionality
+        function renderChatFriends() {
+            let container = document.getElementById('chatFriendsList');
+            let myFriends = db.users.filter(function(u) { 
+                return u.id !== currentUser.id && db.friends.some(function(f) { 
+                    return (f.user1 === currentUser.id && f.user2 === u.id) || (f.user1 === u.id && f.user2 === currentUser.id); 
+                }); 
+            });
+            
+            if(myFriends.length === 0) {
+                container.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">Chưa có bạn bè nào để nhắn tin. Hãy sang tab Bạn Bè kết bạn nhé!</p>';
+                return;
+            }
+
+            container.innerHTML = myFriends.map(function(f) {
+                return '<div onclick="selectChatUser(\'' + f.id + '\', \'' + f.name + '\')" class="p-2 rounded-lg cursor-pointer hover:bg-gray-50 flex items-center space-x-3 transition ' + (activeChatUser === f.id ? 'bg-pink-50' : '') + '">' +
+                    '<div class="w-8 h-8 bg-pink-100 text-pink-700 font-bold rounded-full flex items-center justify-center text-sm">' + f.name.charAt(0) + '</div>' +
+                    '<span class="text-sm font-medium text-gray-700">' + f.name + '</span>' +
+                '</div>';
+            }).join('');
+        }
+
+        function selectChatUser(userId, userName) {
+            activeChatUser = userId;
+            document.getElementById('chatHeader').innerText = 'Đang nhắn tin với: ' + userName;
+            document.getElementById('chatInputArea').classList.remove('hidden');
+            renderChatMessages();
+            renderChatFriends();
+        }
+
+        function renderChatMessages() {
+            let container = document.getElementById('chatMessages');
+            let msgs = db.messages.filter(function(m) { 
+                return (m.senderId === currentUser.id && m.receiverId === activeChatUser) || (m.senderId === activeChatUser && m.receiverId === currentUser.id); 
+            });
+            
+            if(msgs.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 text-sm mt-10">Chưa có tin nhắn nào. Gửi lời chào ngay!</div>';
+                return;
+            }
+
+            container.innerHTML = msgs.map(function(m) {
+                let isMe = m.senderId === currentUser.id;
+                return '<div class="flex ' + (isMe ? 'justify-end' : 'justify-start') + '">' +
+                    '<div class="max-w-[70%] rounded-2xl px-4 py-2 text-sm ' + (isMe ? 'bg-pink-600 text-white' : 'bg-white text-gray-800 border') + '">' +
+                        m.content +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendChatMessage() {
+            let input = document.getElementById('chatMessageInput');
+            let content = input.value.trim();
+            if(!content || !activeChatUser) return;
+
+            db.messages.push({
+                senderId: currentUser.id,
+                receiverId: activeChatUser,
+                content: content,
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            });
+            saveDb();
+            input.value = '';
+            renderChatMessages();
+        }
+
+        // Leaderboard functionality
+        function renderLeaderboard() {
+            let container = document.getElementById('leaderboardList');
+            let sortedUsers = [...db.users].sort(function(a,b) { return b.tickets - a.tickets; });
+            
+            container.innerHTML = sortedUsers.map(function(u, index) {
+                return '<div class="flex items-center justify-between p-3 border rounded-xl ' + (index === 0 ? 'bg-amber-50 border-amber-200' : 'bg-white') + '">' +
+                    '<div class="flex items-center space-x-3">' +
+                        '<span class="font-bold text-sm w-6 text-center ' + (index === 0 ? 'text-amber-600' : 'text-gray-500') + '">#' + (index + 1) + '</span>' +
+                        '<div class="w-8 h-8 bg-gray-200 text-gray-700 font-bold rounded-full flex items-center justify-center text-sm">' + u.name.charAt(0) + '</div>' +
+                        '<span class="text-sm font-bold text-gray-800">' + u.name + '</span>' +
+                    '</div>' +
+                    '<span class="text-sm font-bold text-pink-600 bg-pink-50 px-3 py-1 rounded-full"><i class="fa-solid fa-award mr-1"></i>' + u.tickets + ' phiếu</span>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Admin functionality
+        function openAdminPanel() {
+            let container = document.getElementById('adminUserList');
+            container.innerHTML = db.users.map(function(u) {
+                return '<div class="flex items-center justify-between p-3 border rounded-xl bg-white">' +
+                    '<div>' +
+                        '<h4 class="text-sm font-bold text-gray-800">' + u.name + '</h4>' +
+                        '<span class="text-xs text-gray-500">Số phiếu hiện tại: ' + u.tickets + '</span>' +
+                    '</div>' +
+                    '<div class="space-x-2">' +
+                        '<button onclick="adjustTicket(\'' + u.id + '\', 1)" class="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-green-200 transition">+ Phát Phiếu</button>' +
+                        '<button onclick="adjustTicket(\'' + u.id + '\', -1)" class="bg-red-100 text-red-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-red-200 transition">- Thu hồi</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            document.getElementById('adminModal').classList.remove('hidden');
+        }
+
+        function closeAdminPanel() {
+            document.getElementById('adminModal').classList.add('hidden');
+        }
+
+        function adjustTicket(userId, amount) {
+            let target = db.users.find(function(u) { return u.id === userId; });
+            if(target) {
+                target.tickets = Math.max(0, target.tickets + amount);
+                saveDb();
+                openAdminPanel();
+                updateUI();
+            }
+        }
+    </script>
+</body>
+</html>
