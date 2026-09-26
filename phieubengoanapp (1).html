@@ -320,16 +320,24 @@
         }
 
         function updateUI() {
-            document.getElementById('currentUserBadge.innerText') = currentUser.name;
-            document.getElementById('currentUserBadge').innerText = currentUser.name + ' (' + (currentUser.role === 'admin' ? 'Admin' : 'Thành viên') + ')';
-            if(currentUser.role === 'admin') {
-                document.getElementById('adminNavBtn').classList.remove('hidden');
-            } else {
-                document.getElementById('adminNavBtn').classList.add('hidden');
+            let badge = document.getElementById('currentUserBadge');
+            if(badge && currentUser) {
+                badge.innerText = currentUser.name + ' (' + (currentUser.role === 'admin' ? 'Admin' : 'Thành viên') + ')';
+            }
+            let adminBtn = document.getElementById('adminNavBtn');
+            if(adminBtn) {
+                if(currentUser && currentUser.role === 'admin') {
+                    adminBtn.classList.remove('hidden');
+                } else {
+                    adminBtn.classList.add('hidden');
+                }
             }
 
-            let me = db.users.find(function(u) { return u.id === currentUser.id; });
-            document.getElementById('myTicketCount').innerText = me ? me.tickets : 0;
+            let me = currentUser ? db.users.find(function(u) { return u.id === currentUser.id; }) : null;
+            let ticketCountEl = document.getElementById('myTicketCount');
+            if(ticketCountEl) {
+                ticketCountEl.innerText = me ? me.tickets : 0;
+            }
 
             renderPosts();
             renderFriends();
