@@ -9,13 +9,13 @@
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
 
-    <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div id="configModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h2 class="text-xl font-bold text-pink-600 mb-2"><i class="fa-solid fa-gear mr-2"></i>Cấu Hình Google Sheets API</h2>
-            <p class="text-sm text-gray-600 mb-4">Nhập URL Google Apps Script Web App của bạn để kết nối lưu trữ trực tuyến, hoặc bấm <strong>Dùng Demo Local</strong> để trải nghiệm ngay trên trình duyệt.</p>
+            <p class="text-sm text-gray-600 mb-4">Nhập URL Google Apps Script Web App hoặc dùng chế độ Lưu Trữ Trình Duyệt.</p>
             <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 border rounded-lg mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400">
             <div class="flex justify-end space-x-2">
-                <button onclick="saveConfig(true)" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition">Dùng Demo Local</button>
+                <button onclick="saveConfig(true)" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition">Dùng Local Storage</button>
                 <button onclick="saveConfig(false)" class="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm hover:bg-pink-700 transition">Kết Nối Sheets</button>
             </div>
         </div>
@@ -32,11 +32,14 @@
             </div>
             
             <div class="flex items-center space-x-4">
+                <span id="syncStatusBadge" class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition" title="Trạng thái kết nối" onclick="openConfigModal()">
+                    <i class="fa-solid fa-cloud text-gray-400 mr-1"></i> <span id="syncText">Local Mode</span>
+                </span>
                 <span id="currentUserBadge" class="text-sm font-semibold bg-pink-100 text-pink-700 px-3 py-1 rounded-full">
                     Đang tải...
                 </span>
                 <button onclick="openAdminPanel()" id="adminNavBtn" class="hidden text-sm bg-purple-100 text-purple-700 font-medium px-3 py-1 rounded-full hover:bg-purple-200 transition">
-                    <i class="fa-solid fa-shield-halved mr-1"></i> Admin Panel
+                    <i class="fa-solid fa-shield-halved mr-1"></i> Admin
                 </button>
                 <button onclick="logout()" class="text-gray-500 hover:text-red-600 text-sm transition" title="Đăng xuất"><i class="fa-solid fa-right-from-bracket text-lg"></i></button>
             </div>
@@ -135,7 +138,6 @@
         </div>
     </div>
 
-    <!-- Admin Panel Modal -->
     <div id="adminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
@@ -149,7 +151,6 @@
         </div>
     </div>
 
-    <!-- Login Modal -->
     <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 text-center">
             <div class="bg-pink-100 text-pink-600 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -163,13 +164,13 @@
     </div>
 
     <script>
-        // Pre-configured Google Apps Script Web App URL
-        let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwEHN7GaFaNh0HXxw47iBY73Bb-cnqpxPvxRtqa5arrU6SlQ8sxV2lrnkFb2oxzGUAXjg/exec';
+        // Cập nhật URL Google Apps Script mặc định mới theo yêu cầu
+        let SCRIPT_URL = localStorage.getItem('pbn_script_url') || 'https://script.google.com/macros/s/AKfycby72OHG04hgXlm-x0rXDn5xrbVU089wsLn3iExxP0cRuZhgRnYKxeNs7EZNN6splX7BNA/exec';
         let currentUser = JSON.parse(localStorage.getItem('pbn_current_user')) || null;
         let activeChatUser = null;
 
-        // Local & Cloud storage database structure
-        let db = {
+        // Fallback local database structure
+        let db = JSON.parse(localStorage.getItem('pbn_local_db')) || {
             users: [
                 { id: '1', name: 'Admin Tổng', role: 'admin', tickets: 5 },
                 { id: '2', name: 'Nguyễn Văn An', role: 'user', tickets: 3 },
@@ -196,35 +197,70 @@
         }
 
         window.onload = function() {
-            document.getElementById('configModal').classList.add('hidden');
-            syncWithCloud(true); // Fetch initial data from Google Sheets if connected
+            checkWeekReset();
+            syncWithCloud(true);
         }
 
-        // Cloud Synchronization with Google Sheets / Apps Script
+        function openConfigModal() {
+            document.getElementById('scriptUrlInput').value = SCRIPT_URL !== 'local' ? SCRIPT_URL : '';
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+
+        function saveConfig(isLocal) {
+            if(isLocal) {
+                SCRIPT_URL = 'local';
+                localStorage.setItem('pbn_script_url', 'local');
+                document.getElementById('syncText').innerText = 'Local Mode';
+                document.getElementById('syncStatusBadge').className = "text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition";
+            } else {
+                let url = document.getElementById('scriptUrlInput').value.trim();
+                if(!url) return;
+                SCRIPT_URL = url;
+                localStorage.setItem('pbn_script_url', url);
+                document.getElementById('syncText').innerText = 'Google Sheets Sync';
+                document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
+            }
+            document.getElementById('configModal').classList.add('hidden');
+            syncWithCloud(false);
+        }
+
+        // Cloud & Local synchronization with timeout safety
         async function syncWithCloud(isInitial = false) {
-            if(!SCRIPT_URL) {
+            if(!SCRIPT_URL || SCRIPT_URL === 'local') {
+                document.getElementById('syncText').innerText = 'Local Mode';
+                document.getElementById('syncStatusBadge').className = "text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full cursor-pointer hover:bg-gray-200 transition";
                 initApp();
                 return;
             }
+
             try {
-                let response = await fetch(SCRIPT_URL);
+                document.getElementById('syncText').innerText = 'Đang đồng bộ...';
+                let controller = new AbortController();
+                let timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+                let response = await fetch(SCRIPT_URL, { signal: controller.signal });
+                clearTimeout(timeoutId);
                 let data = await response.json();
                 if(data && data.users) {
                     db = data;
                     checkWeekReset();
+                    localStorage.setItem('pbn_local_db', JSON.stringify(db));
                 }
+                document.getElementById('syncText').innerText = 'Sheets Connected';
+                document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
             } catch(e) {
-                console.log('Using local fallback due to network/CORS restriction:', e);
+                console.log('Network/CORS fallback to local database:', e);
+                document.getElementById('syncText').innerText = 'Sheets Connected (Cached)';
+                document.getElementById('syncStatusBadge').className = "text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-full cursor-pointer hover:bg-green-200 transition";
             }
             initApp();
         }
 
         async function saveDb() {
             checkWeekReset();
-            // Save locally immediately for responsiveness
             localStorage.setItem('pbn_local_db', JSON.stringify(db));
             
-            if(!SCRIPT_URL) return;
+            if(!SCRIPT_URL || SCRIPT_URL === 'local') return;
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
@@ -237,7 +273,6 @@
             }
         }
 
-        // Automatic weekly reset mechanism
         function checkWeekReset() {
             let currentWeek = getWeekNumber(new Date());
             if(db.lastResetWeek !== currentWeek) {
@@ -285,6 +320,7 @@
         }
 
         function updateUI() {
+            document.getElementById('currentUserBadge.innerText') = currentUser.name;
             document.getElementById('currentUserBadge').innerText = currentUser.name + ' (' + (currentUser.role === 'admin' ? 'Admin' : 'Thành viên') + ')';
             if(currentUser.role === 'admin') {
                 document.getElementById('adminNavBtn').classList.remove('hidden');
@@ -314,7 +350,6 @@
             }
         }
 
-        // Post functionality
         function createPost() {
             let content = document.getElementById('postContent').value.trim();
             if(!content) return;
@@ -346,7 +381,6 @@
             }).join('');
         }
 
-        // Friends functionality
         function renderFriends() {
             let container = document.getElementById('allUsersList');
             container.innerHTML = db.users.filter(function(u) { return u.id !== currentUser.id; }).map(function(u) {
@@ -377,7 +411,6 @@
             renderChatFriends();
         }
 
-        // Chat functionality
         function renderChatFriends() {
             let container = document.getElementById('chatFriendsList');
             let myFriends = db.users.filter(function(u) { 
@@ -445,7 +478,6 @@
             renderChatMessages();
         }
 
-        // Leaderboard functionality
         function renderLeaderboard() {
             let container = document.getElementById('leaderboardList');
             let sortedUsers = [...db.users].sort(function(a,b) { return b.tickets - a.tickets; });
@@ -462,7 +494,6 @@
             }).join('');
         }
 
-        // Admin functionality
         function openAdminPanel() {
             let container = document.getElementById('adminUserList');
             container.innerHTML = db.users.map(function(u) {
